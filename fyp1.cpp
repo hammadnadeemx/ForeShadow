@@ -6,66 +6,69 @@ using namespace std;
 unsigned long int curtime=0;// time used for time based eviction policies
 class cacheblock{
 	private:
-	unsigned short *memblock;// the fullfat storage -cache lines in our case
+	unsigned int *memblock;// the fullfat storage -cache lines in our case stores mem addresses
 	int blocksize;// number of data lines
 	int ep;// eviction policy needed to handle various tasks
-	unsigned short *freqcount;// used to store frequency of lfu or time stamp of lru
+	unsigned int *freqcount;// used to store frequency of lfu or time stamp of lru
 	int indexf; // used by fifo or lifo to manage data
 	public:
 	cacheblock(int size=15,int eviction=1){ // setup of variables e -> 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out
+		memblock=nullptr;
+		freqcount=nullptr;
 		blocksize=size;
 		ep=eviction;
 		if((ep==2)||(ep==3)){// need more storage for frequencies or time stamps
-			freqcount=new unsigned short[blocksize];
+			freqcount=new unsigned int[blocksize];
 			for(int i=0; i<blocksize;i++){
 				freqcount[i]=0;			
 			}
 		}
 		else if(ep==6){// need more storage for frequencies or time stamps
-			freqcount=new unsigned short[blocksize];
+			freqcount=new unsigned int[blocksize];
 			for(int i=0; i<blocksize;i++){
 				freqcount[i]=9999;	// max value so cache can fill initially		
 			}
 		}
 		else{
-			freqcount=NULL;
+			freqcount=nullptr;
 		}
 		indexf=0;
-		memblock=new unsigned short[blocksize];
+		memblock=new unsigned int[blocksize];
 		for(int i=0; i<blocksize;i++){
 			memblock[i]=0;			
 		}
-		cout<<"Cache block with "<<blocksize<<" lines built \n";
+		//cout<<"Cache block with "<<blocksize<<" lines built \n";
 	}
 	void editparameters(int size=15,int eviction=1){
-		delete[] memblock;
-		delete[]freqcount;// add checks here to prevent segfaults
+		//if(memblock!=nullptr)
+			//delete[] memblock;
+		//if(freqcount!=nullptr)
+			//delete[]freqcount;// add checks here to prevent segfaults
 		blocksize=size;
 		ep=eviction;
 		if((ep==2)||(ep==3)){// need more storage for frequencies or time stamps
-			freqcount=new unsigned short[blocksize];
+			freqcount=new unsigned int[blocksize];
 			for(int i=0; i<blocksize;i++){
 				freqcount[i]=0;			
 			}
 		}
 		else if(ep==6){// need more storage for frequencies or time stamps
-			freqcount=new unsigned short[blocksize];
+			freqcount=new unsigned int[blocksize];
 			for(int i=0; i<blocksize;i++){
 				freqcount[i]=9999;	// max value so cache can fill initially		
 			}
 		}
 		else{
-			freqcount=NULL;
+			freqcount=nullptr;
 		}
 		indexf=0;
-		memblock=new unsigned short[blocksize];
+		memblock=new unsigned int[blocksize];
 		for(int i=0; i<blocksize;i++){
 			memblock[i]=0;			
 		}
-		cout<<"Cache updated \n";
+		cout<<"Cache configuration updated \n";
 	}
-	void display(){// print content of block
-		//cout<<"blocksize: "<<blocksize<<" ep: "<<ep<<" index: "<<indexf<<endl;
+	void print(){// print content of block
 		if(ep==4){
 			cout<<"index is "<<indexf<<endl;
 		}
@@ -83,7 +86,7 @@ class cacheblock{
 			cout<<endl;
 		}
 	}
-	bool isHit(unsigned short memaddress){// check to see if data at memory is present in cache block
+	bool isHit(unsigned int memaddress){// check to see if data at memory is present in cache block
 		if(memaddress>=0){
 			for(int i=0; i<blocksize;i++){
 				if(memblock[i]==memaddress){
@@ -103,7 +106,7 @@ class cacheblock{
 			return false;
 		}
 	}
-	void fetchFromMem(unsigned short memaddress){// instructs to place mem in cache
+	void fetchFromMem(unsigned int memaddress){// instructs to place mem in cache
 		switch(ep){
 			case 1:{ // random replacement 
 				int p=rand()%blocksize;
@@ -111,7 +114,7 @@ class cacheblock{
 				break;
 			}
 			case 2:{//least recently used 
-				unsigned short minval=freqcount[0],minindex=0;
+				unsigned int minval=freqcount[0],minindex=0;
 				for(int i=0; i<blocksize;i++){
 					if(minval>=freqcount[i]){
 						minindex=i;
@@ -123,7 +126,7 @@ class cacheblock{
 				break;
 			}
 			case 3:{//least frequently used
-				unsigned short minval=-1,minindex=0;
+				unsigned int minval=-1,minindex=0;
 				for(int i=0; i<blocksize;i++){
 					if(minval>freqcount[i]){
 						minindex=i;
@@ -149,7 +152,7 @@ class cacheblock{
 				break;
 			}
 			case 6:{//most recently used 
-				unsigned short maxval=freqcount[0],maxindex=0;
+				unsigned int maxval=freqcount[0],maxindex=0;
 				for(int i=0; i<blocksize;i++){
 					if(maxval<freqcount[i]){
 						maxindex=i;
@@ -165,20 +168,25 @@ class cacheblock{
 		}	
 	}
 	~cacheblock(){
-		delete[] memblock;// sort segfaults 
+		//if(memblock!=nullptr)
+		//	delete[] memblock;// sort segfaults 
+		//if(freqcount!=nullptr)
+		//	delete[] freqcount;
 	}
 };
-class cache{
+class cache{// need to turn this into abstract class
 	private:
 	cacheblock *ptr;// the cache blocks
 	int nblocks; // len of ptr in otherwords number of sets
 	int type;// 1 is direct mapped ,2 is n-set associative, 3 is fully set associative
 	int epolicy;// 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out 
 	int lines;// used to tell how many lines per block/set of cache
+	unsigned int hits;
 	public:
 	cache(int sets=1, int ctype=1,int evictionpolicy=1,int linesperset=8){
 		nblocks=sets;
 		type=ctype;
+		hits=0;
 		epolicy=evictionpolicy;
 		lines=linesperset;
 		if((type==3)||(nblocks==1)){
@@ -191,22 +199,43 @@ class cache{
 			}
 		}	
 	}
-	bool isHit(unsigned short memaddr){// need to call this to maintain time value else update time manually
-		curtime++; // increament time value
+	void editcacheconfig(int sets=1, int ctype=1,int evictionpolicy=1,int linesperset=8){
+		//if(ptr!=nullptr)
+			//delete [] ptr;
+		nblocks=sets;
+		type=ctype;
+		hits=0;
+		epolicy=evictionpolicy;
+		lines=linesperset;
+		if((type==3)||(nblocks==1)){
+			ptr=new cacheblock(lines,epolicy);
+		}
+		else{
+			ptr=new  cacheblock[nblocks]();
+			for(int i=0;i<nblocks;i++){// edit parameters here or use std vector !!!
+				ptr[i].editparameters(lines,epolicy);
+			}
+		}	
+	}
+	unsigned int getcurrenthit(){
+		return hits;
+	}
+	bool isHit(unsigned int memaddr){// need to call this to maintain time value else update time manually
 		for(int i=0;i<nblocks;i++){
-			if(ptr[i].isHit(memaddr))
-				return true;			
+			if(ptr[i].isHit(memaddr)){
+				hits++;
+				return true;		
+			}	
 		}
 		return false;
 	}
 	void display(){// just to see whats going on 
 		for(int i=0;i<nblocks;i++){
 			cout<<"Block "<<i<<":\n";
-			ptr[i].display();
-			cout<<endl;
+			ptr[i].print();
 		}		
 	}
-	void updatecache(unsigned short memaddress){// where does the pretecher come in ? needs work
+	void updatecache(unsigned int memaddress){// where does the pretecher come in ? needs work
 		switch(type){
 			case 1:{ // direct mapped
 				int setnum=memaddress%nblocks;
@@ -227,23 +256,170 @@ class cache{
 		}
 	}
 	~cache(){
-		delete[] ptr;	// this creates a seg fault need to debug this	
+		//delete[] ptr;	// this creates a seg fault need to debug this	
 	}
+};
+class directmapped: public cache{
+	private:
+	cache *ptr;
+	public:
+	directmapped(int numsets=8,int evictionpolicy=1){
+		ptr=new cache(numsets,1,evictionpolicy,1);
+	}
+	void editcacheconfig(int numsets=8,int evictionpolicy=1){
+		//if(ptr!=nullptr)
+			//delete ptr;
+		ptr=new cache(numsets,1,evictionpolicy,1);
+	}
+	bool ishit(unsigned int memaddr){
+		return ptr->isHit(memaddr);
+	}
+	unsigned int getcurrenthit(){
+		return ptr->getcurrenthit();
+	}
+	void display(){
+		ptr->display();
+	}
+	void updatecache(unsigned int memaddr){
+		ptr->updatecache(memaddr);
+	}	
+	~directmapped(){
+		//delete ptr;
+	}	
+};
+class fullyassociative: public cache{
+	private:
+	cache *ptr;
+	public:
+	fullyassociative(int numoflines=8,int evictionpolicy=1){
+		ptr=new cache(1,3,evictionpolicy,numoflines);
+	}
+	void editcacheconfig(int numoflines=8,int evictionpolicy=1){
+		//if(ptr!=nullptr)
+			//delete ptr;
+		ptr=new cache(1,3,evictionpolicy,numoflines);
+	}
+	bool ishit(unsigned int memaddr){
+		return ptr->isHit(memaddr);
+	}
+	unsigned int getcurrenthit(){
+		return ptr->getcurrenthit();
+	}
+	void display(){
+		ptr->display();
+	}
+	void updatecache(unsigned int memaddr){
+		ptr->updatecache(memaddr);
+	}	
+	~fullyassociative(){
+		//delete ptr;
+	}	
+};
+class nsetassociative: public cache{
+	private:
+	cache *ptr;
+	public:
+	nsetassociative(int numoflines=8,int evictionpolicy=1,int numofsets=4){
+		ptr=new cache(numofsets,2,evictionpolicy,numoflines);
+	}
+	void editcacheconfig(int numoflines=8,int evictionpolicy=1,int numofsets=4){
+		//if(ptr!=nullptr)
+			//delete ptr;
+		ptr=new cache(numofsets,2,evictionpolicy,numoflines);
+	}
+	bool ishit(unsigned int memaddr){
+		return ptr->isHit(memaddr);
+	}
+	unsigned int getcurrenthit(){
+		return ptr->getcurrenthit();
+	}
+	void display(){
+		ptr->display();
+	}
+	void updatecache(unsigned int memaddr){
+		ptr->updatecache(memaddr);
+	}	
+	~nsetassociative(){
+		//delete ptr;
+	}	
+};
+class simulator{
+	private:
+	cache **ptr;//  array of caches
+	bool setup;// all caches under this simulation ready for use ?
+	int numofcaches;// number of caches
+	public:
+	simulator(int numberofcaches){
+		ptr=new cache * [numberofcaches];
+		numofcaches=numberofcaches;
+	}
+	bool setcache(int index, int type, int sets,int lines, int eviction){
+		bool op=false;
+		if((index<numofcaches)&&(index>=0)){
+			switch(type){
+				case 1:// direct mapped
+					ptr[index]=new directmapped(sets,eviction);
+					ptr[index]->editcacheconfig(sets,1,eviction,1);//need to fix polymorphism
+					op=true;
+				break;
+				case 2:// nset associative
+					ptr[index]=new nsetassociative(lines,eviction,sets);
+					ptr[index]->editcacheconfig(sets,2,eviction,lines);
+					op=true;
+				break;
+				case 3:// fully associative 
+					ptr[index]=new fullyassociative(lines,eviction);
+					ptr[index]->editcacheconfig(1,3,eviction,lines);
+					op=true;
+				break;
+				default:
+					cout<<"invalid cache type specified\n";		
+			}
+		}
+		else{
+			cout<<"invalid index\n";
+		}
+		return op;		
+	}
+	bool feedforward(unsigned int memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
+		curtime++; // increament time value
+		for(int i=0;i<numofcaches;i++){
+			if(!(ptr[i]->isHit(memaddr))){
+				ptr[i]->updatecache(memaddr);
+				return false;	
+			}
+		}
+		return true;
+	}
+	void display(){
+		for(int i=0;i<numofcaches;i++){
+			cout<<"cache "<<i+1<<endl;
+			ptr[i]->display();
+			cout<<"number of hits "<<ptr[i]->getcurrenthit()<<endl<<endl;		
+		}
+	}
+	~simulator(){
+		if(ptr!=nullptr){
+			for(int i=0;i<numofcaches;i++){
+				if(ptr[i]!=nullptr){
+					//delete ptr[i]; fix these seg faults later
+				}
+			}
+			//delete [] ptr;
+		}
+	}	
 };
 int main(){
 	srand(time(0));
-	cache test(4,2,3,8); //4-way set associative, 2 means n-set associative,lfu policy, 8 lines per set
-	unsigned short t=0,hit=0;
+	simulator demo(2);
+	demo.setcache(0,1,16,1,2);// 0 is index of first cache , 1 is directmapped, 16 sets ,1 line per cache doesnt apply here ,2 is least recently used 
+	demo.setcache(1,3,8,16,3);//1th cache, fully associative,doesnt apply here,16 lines, least frequently used
+	unsigned int t=0;
 	for(int i=0; i<2000;i++){
-		t=rand()%3000;
-		if(test.isHit(t)){
-			hit++;			
-		}
-		else{
-			test.updatecache(t);
-		}
-		test.display();
+		t=rand()%500;
+		demo.feedforward(t);
+		demo.display();
+		cout<<"-----------------------------------------------------\n";			
 	}
-	cout<<hit<<" hits out of 2000\n";
 	return 0;
 }
