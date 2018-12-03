@@ -2,6 +2,9 @@
 #include <iostream>
 #include <stdlib.h>     
 #include <time.h>
+#include <fstream>
+#include <string>
+#include <sstream>
 using namespace std;
 unsigned long int curtime=0;// time used for time based eviction policies
 class cacheblock{
@@ -133,6 +136,37 @@ class cacheblock{
 				cout<<" frequency of use "<<freqcount[i];
 			}
 			cout<<endl;
+		}
+	}
+	void writec2f(fstream &obj){// write content to file
+		string temp;
+		if(ep==4){
+			temp="index is ";
+			temp+=to_string(indexf);
+			temp+="\n";
+			obj<<temp;
+		}
+		else if ((ep==2)||(ep==6)){
+			temp="current time is ";
+			temp+=to_string(curtime);
+			temp+="\n";
+			obj<<temp;
+		}
+		for(int i=0;i<blocksize;i++){
+			temp="Line ";
+			temp+=to_string(i);
+			temp+=": ";
+			temp+=to_string(memblock[i]);
+			if(ep==2){
+				temp+=" time stamp ";
+				temp+=to_string(freqcount[i]);
+			}
+			else if(ep==3){
+				temp+=" frequency of use ";
+				temp+=to_string(freqcount[i]);
+			}
+			temp+="\n";
+			obj<<temp;
 		}
 	}
 	bool isHit(unsigned int memaddress){// check to see if data at memory is present in cache block
@@ -338,6 +372,17 @@ class cache{// need to turn this into abstract class
 			ptr[i].print();
 		}		
 	}
+	void print2file(fstream &obj){// to link with the interface we store data on files
+		string temp;
+		for(int i=0;i<nblocks;i++){
+			temp="";
+			temp+="Block ";
+			temp+=to_string(i);
+			temp+=":\n";
+			obj<<temp;
+			ptr[i].writec2f(obj);
+		}
+	}
 	void updatecache(unsigned int memaddress){// where does the pretecher come in ? needs work
 		switch(type){
 			case 1:{ // direct mapped
@@ -386,6 +431,9 @@ class directmapped: public cache{
 	void display(){
 		ptr->display();
 	}
+	void print2file(fstream &obj){
+		ptr->print2file(obj);
+	}
 	void updatecache(unsigned int memaddr){
 		ptr->updatecache(memaddr);
 	}	
@@ -417,6 +465,9 @@ class fullyassociative: public cache{
 	void display(){
 		ptr->display();
 	}
+	void print2file(fstream &obj){
+		ptr->print2file(obj);
+	}
 	void updatecache(unsigned int memaddr){
 		ptr->updatecache(memaddr);
 	}	
@@ -447,6 +498,9 @@ class nsetassociative: public cache{
 	}
 	void display(){
 		ptr->display();
+	}
+	void print2file(fstream &obj){
+		ptr->print2file(obj);
 	}
 	void updatecache(unsigned int memaddr){
 		ptr->updatecache(memaddr);
@@ -486,11 +540,13 @@ class simulator{
 	int numofcaches;// number of caches
 	int predictres[4];
 	prefetcher* sbpf;
+	fstream fileout;
 	public:
 	simulator(int numberofcaches){
 		ptr=new cache * [numberofcaches];
 		numofcaches=numberofcaches;
 		sbpf=new streambuffer(4);
+		fileout.open("outputdump",ios::out);
 	}
 	bool setcache(int index, int type, int sets,int lines, int eviction){
 		bool op=false;
@@ -539,6 +595,22 @@ class simulator{
 			cout<<"number of hits "<<ptr[i]->getcurrenthit()<<endl<<endl;		
 		}
 	}
+	void write2file(){// need to replace with file writers
+		string temp;
+		for(int i=0;i<numofcaches;i++){
+			temp="";
+			temp+="Cache ";
+			temp+=to_string(i+1);
+			temp+="\n";
+			fileout<<temp;
+			ptr[i]->print2file(fileout);
+			temp="number of hits ";
+			temp+=to_string(ptr[i]->getcurrenthit());
+			temp+="\n\n";	
+			fileout<<temp;
+		}
+		fileout<<"-----------------------------------------------------\n";
+	}
 	~simulator(){
 		if(ptr!=nullptr){
 			for(int i=0;i<numofcaches;i++){
@@ -549,6 +621,7 @@ class simulator{
 			delete [] ptr;
 			ptr=nullptr;
 		}
+		fileout.close();
 	}	
 };
 int main(){
@@ -562,6 +635,7 @@ int main(){
 		t=rand()%5000;
 		demo.emulatebehaviour(t);
 		demo.display();
+		demo.write2file();
 		cout<<"-----------------------------------------------------\n";			
 	}
 	cout<<"sim ended\n";
