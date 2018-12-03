@@ -621,7 +621,7 @@ class simulator{
 			delete [] ptr;
 			ptr=nullptr;
 		}
-		fileout.close();
+		fileout.flush();// doesnt flush
 	}	
 };
 int main(){
@@ -634,8 +634,8 @@ int main(){
 	for(int i=0; i<2000;i++){
 		t=rand()%5000;
 		demo.emulatebehaviour(t);
-		demo.display();
 		demo.write2file();
+		demo.display();
 		cout<<"-----------------------------------------------------\n";			
 	}
 	cout<<"sim ended\n";
