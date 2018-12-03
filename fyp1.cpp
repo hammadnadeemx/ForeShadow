@@ -12,7 +12,7 @@ class cacheblock{
 	unsigned int *freqcount;// used to store frequency of lfu or time stamp of lru
 	int indexf; // used by fifo or lifo to manage data
 	public:
-	cacheblock(int size=15,int eviction=1){ // setup of variables e -> 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out
+	cacheblock(int size,int eviction){ // setup of variables e -> 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out
 		memblock=nullptr;
 		freqcount=nullptr;
 		blocksize=size;
@@ -37,13 +37,62 @@ class cacheblock{
 		for(int i=0; i<blocksize;i++){
 			memblock[i]=0;			
 		}
-		//cout<<"Cache block with "<<blocksize<<" lines built \n";
+	}
+	cacheblock(){
+		memblock=nullptr;
+		freqcount=nullptr;
+		blocksize=0;
+		ep=0;
+		indexf=0;
+	}
+	cacheblock(const cacheblock &old){
+		this->memblock=nullptr;
+		this->freqcount=nullptr;
+		this->blocksize=old.blocksize;
+		this->ep=old.ep;
+		this->indexf=old.indexf;
+		if((ep==2)||(ep==3)||(ep=6)){// need more storage for frequencies or time stamps
+			freqcount=new unsigned int[blocksize];
+			for(int i=0; i<blocksize;i++){
+				this->freqcount[i]=old.freqcount[i];			
+			}
+		}
+		memblock=new unsigned int[blocksize];
+		for(int i=0; i<blocksize;i++){
+			this->memblock[i]=old.memblock[i];			
+		}
+	}
+	cacheblock& operator=(const cacheblock &rhs){
+		if(this!=&rhs){
+			if(memblock!=nullptr)
+				delete[] memblock;
+			if(freqcount!=nullptr)
+				delete[]freqcount;// add checks here to prevent segfaults
+			this->memblock=nullptr;
+			this->freqcount=nullptr;
+			this->blocksize=rhs.blocksize;
+			this->ep=rhs.ep;
+			this->indexf=rhs.indexf;
+			if((ep==2)||(ep==3)||(ep=6)){// need more storage for frequencies or time stamps
+				freqcount=new unsigned int[blocksize];
+				for(int i=0; i<blocksize;i++){
+					this->freqcount[i]=rhs.freqcount[i];			
+				}
+			}
+			memblock=new unsigned int[blocksize];
+			for(int i=0; i<blocksize;i++){
+				this->memblock[i]=rhs.memblock[i];			
+			}
+		}
+		return *this;
 	}
 	void editparameters(int size=15,int eviction=1){
-		//if(memblock!=nullptr)
-			//delete[] memblock;
-		//if(freqcount!=nullptr)
-			//delete[]freqcount;// add checks here to prevent segfaults
+		if(memblock!=nullptr)
+			delete[] memblock;
+		if(freqcount!=nullptr)
+			delete[]freqcount;// add checks here to prevent segfaultsmemblock=nullptr;
+		freqcount=nullptr;
+		memblock=nullptr;
 		blocksize=size;
 		ep=eviction;
 		if((ep==2)||(ep==3)){// need more storage for frequencies or time stamps
@@ -116,7 +165,7 @@ class cacheblock{
 			case 2:{//least recently used 
 				unsigned int minval=freqcount[0],minindex=0;
 				for(int i=0; i<blocksize;i++){
-					if(minval>=freqcount[i]){
+					if(minval>freqcount[i]){
 						minindex=i;
 						minval=freqcount[i];
 					}
@@ -168,10 +217,14 @@ class cacheblock{
 		}	
 	}
 	~cacheblock(){
-		//if(memblock!=nullptr)
-		//	delete[] memblock;// sort segfaults 
-		//if(freqcount!=nullptr)
-		//	delete[] freqcount;
+		if(memblock!=nullptr){
+			delete[] memblock;// sort segfaults 
+			memblock=nullptr;
+		}
+		if(freqcount!=nullptr){
+			delete[] freqcount;
+			freqcount=nullptr;
+		}
 	}
 };
 class cache{// need to turn this into abstract class
@@ -179,11 +232,12 @@ class cache{// need to turn this into abstract class
 	cacheblock *ptr;// the cache blocks
 	int nblocks; // len of ptr in otherwords number of sets
 	int type;// 1 is direct mapped ,2 is n-set associative, 3 is fully set associative
-	int epolicy;// 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out 
+	int epolicy;// 1 is random replacement ,2 is least recently used, 3 is least frequently used, 4 is first in first out  5 lifo 6 mru
 	int lines;// used to tell how many lines per block/set of cache
 	unsigned int hits;
 	public:
-	cache(int sets=1, int ctype=1,int evictionpolicy=1,int linesperset=8){
+	cache(int sets, int ctype,int evictionpolicy,int linesperset){
+		ptr=nullptr;
 		nblocks=sets;
 		type=ctype;
 		hits=0;
@@ -199,9 +253,58 @@ class cache{// need to turn this into abstract class
 			}
 		}	
 	}
+	cache(){
+		ptr=nullptr;
+		nblocks=0;
+		type=0;
+		hits=0;
+		epolicy=0;
+		lines=0;
+	}
+	cache(const cache &old){
+		ptr=nullptr;
+		this->nblocks=old.nblocks;
+		this->type=old.type;
+		this->hits=old.hits;
+		this->epolicy=old.epolicy;
+		this->lines=old.lines;
+		if(nblocks<=1){
+			ptr=new cacheblock(lines,epolicy);
+			*ptr=*(old.ptr);
+		}
+		else{
+			ptr=new  cacheblock[nblocks]();
+			for(int i=0;i<nblocks;i++){// edit parameters here or use std vector !!!
+				this->ptr[i]=old.ptr[i];
+			}
+		}
+	}
+	cache& operator=(const cache &rhs){
+		if(this!=&rhs){
+			if(ptr!=nullptr)
+				delete [] ptr;
+			ptr=nullptr;
+			this->nblocks=rhs.nblocks;
+			this->type=rhs.type;
+			this->hits=rhs.hits;
+			this->epolicy=rhs.epolicy;
+			this->lines=rhs.lines;
+			if(nblocks<=1){
+				ptr=new cacheblock(lines,epolicy);
+				*ptr=*(rhs.ptr);
+			}
+			else{
+				ptr=new  cacheblock[nblocks]();
+				for(int i=0;i<nblocks;i++){// edit parameters here or use std vector !!!
+					this->ptr[i]=(rhs.ptr[i]);
+				}
+			}
+		}
+		return *this;
+	}
 	void editcacheconfig(int sets=1, int ctype=1,int evictionpolicy=1,int linesperset=8){
-		//if(ptr!=nullptr)
-			//delete [] ptr;
+		if(ptr!=nullptr)
+			delete [] ptr;
 		nblocks=sets;
 		type=ctype;
 		hits=0;
@@ -256,19 +359,22 @@ class cache{// need to turn this into abstract class
 		}
 	}
 	~cache(){
-		//delete[] ptr;	// this creates a seg fault need to debug this	
+		if(ptr!=nullptr){
+			delete[] ptr;
+			ptr=nullptr;
+		}
 	}
 };
 class directmapped: public cache{
 	private:
 	cache *ptr;
 	public:
-	directmapped(int numsets=8,int evictionpolicy=1){
-		ptr=new cache(numsets,1,evictionpolicy,1);
+	directmapped(int numsets=8){
+		ptr=new cache(numsets,1,1,1);
 	}
 	void editcacheconfig(int numsets=8,int evictionpolicy=1){
-		//if(ptr!=nullptr)
-			//delete ptr;
+		if(ptr!=nullptr)
+			delete ptr;
 		ptr=new cache(numsets,1,evictionpolicy,1);
 	}
 	bool ishit(unsigned int memaddr){
@@ -284,7 +390,10 @@ class directmapped: public cache{
 		ptr->updatecache(memaddr);
 	}	
 	~directmapped(){
-		//delete ptr;
+		if(ptr!=nullptr){
+			delete ptr;
+			ptr=nullptr;
+		}
 	}	
 };
 class fullyassociative: public cache{
@@ -295,8 +404,8 @@ class fullyassociative: public cache{
 		ptr=new cache(1,3,evictionpolicy,numoflines);
 	}
 	void editcacheconfig(int numoflines=8,int evictionpolicy=1){
-		//if(ptr!=nullptr)
-			//delete ptr;
+		if(ptr!=nullptr)
+			delete ptr;
 		ptr=new cache(1,3,evictionpolicy,numoflines);
 	}
 	bool ishit(unsigned int memaddr){
@@ -312,7 +421,10 @@ class fullyassociative: public cache{
 		ptr->updatecache(memaddr);
 	}	
 	~fullyassociative(){
-		//delete ptr;
+		if(ptr!=nullptr){
+			delete ptr;
+			ptr=nullptr;
+		}
 	}	
 };
 class nsetassociative: public cache{
@@ -323,8 +435,8 @@ class nsetassociative: public cache{
 		ptr=new cache(numofsets,2,evictionpolicy,numoflines);
 	}
 	void editcacheconfig(int numoflines=8,int evictionpolicy=1,int numofsets=4){
-		//if(ptr!=nullptr)
-			//delete ptr;
+		if(ptr!=nullptr)
+			delete ptr;
 		ptr=new cache(numofsets,2,evictionpolicy,numoflines);
 	}
 	bool ishit(unsigned int memaddr){
@@ -340,7 +452,31 @@ class nsetassociative: public cache{
 		ptr->updatecache(memaddr);
 	}	
 	~nsetassociative(){
-		//delete ptr;
+		if(ptr!=nullptr){
+			delete ptr;
+			ptr=nullptr;
+		}
+	}	
+};
+class prefetcher{
+	public:
+	virtual void predictn(int,int*)=0;
+	virtual int getsize()=0;
+};
+class streambuffer: public prefetcher{
+	private:
+	int len;// specifies the number of next best possible addresses which could be asked for by cpu
+	public:
+	streambuffer(int lenght=4){
+		len=lenght;
+	}
+	void predictn(int address, int* result){
+		for(int i=0;i<len;i++){
+			result[i]=address+i+1;
+		}
+	}
+	int getsize(){
+		return len;
 	}	
 };
 class simulator{
@@ -348,18 +484,21 @@ class simulator{
 	cache **ptr;//  array of caches
 	bool setup;// all caches under this simulation ready for use ?
 	int numofcaches;// number of caches
+	int predictres[4];
+	prefetcher* sbpf;
 	public:
 	simulator(int numberofcaches){
 		ptr=new cache * [numberofcaches];
 		numofcaches=numberofcaches;
+		sbpf=new streambuffer(4);
 	}
 	bool setcache(int index, int type, int sets,int lines, int eviction){
 		bool op=false;
 		if((index<numofcaches)&&(index>=0)){
 			switch(type){
 				case 1:// direct mapped
-					ptr[index]=new directmapped(sets,eviction);
-					ptr[index]->editcacheconfig(sets,1,eviction,1);//need to fix polymorphism
+					ptr[index]=new directmapped(sets);
+					ptr[index]->editcacheconfig(sets,1,1,1);//need to fix polymorphism
 					op=true;
 				break;
 				case 2:// nset associative
@@ -381,15 +520,17 @@ class simulator{
 		}
 		return op;		
 	}
-	bool feedforward(unsigned int memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
+	void emulatebehaviour(unsigned int memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
 		curtime++; // increament time value
 		for(int i=0;i<numofcaches;i++){
-			if(!(ptr[i]->isHit(memaddr))){
-				ptr[i]->updatecache(memaddr);
-				return false;	
+			if(!(ptr[i]->isHit(memaddr))){// if not hit
+				sbpf->predictn(memaddr,predictres);// get sequence of address to fetch
+				for(int j=0;j<sbpf->getsize();j++){// prefetch those sequences
+					if(!(ptr[i]->isHit(predictres[j])))// as long as its not already in the cache ( dont want duplicates)
+						ptr[i]->updatecache(predictres[j]);	
+				}
 			}
 		}
-		return true;
 	}
 	void display(){
 		for(int i=0;i<numofcaches;i++){
@@ -402,24 +543,27 @@ class simulator{
 		if(ptr!=nullptr){
 			for(int i=0;i<numofcaches;i++){
 				if(ptr[i]!=nullptr){
-					//delete ptr[i]; fix these seg faults later
+					delete ptr[i]; 
 				}
 			}
-			//delete [] ptr;
+			delete [] ptr;
+			ptr=nullptr;
 		}
 	}	
 };
 int main(){
 	srand(time(0));
-	simulator demo(2);
-	demo.setcache(0,1,16,1,2);// 0 is index of first cache , 1 is directmapped, 16 sets ,1 line per cache doesnt apply here ,2 is least recently used 
+	simulator demo(3);
+	demo.setcache(0,1,16,1,1);// 0 is index of first cache , 1 is directmapped, 16 sets ,1 line per cache, doesnt apply here ,1 rr but it doesnt apply here
 	demo.setcache(1,3,8,16,3);//1th cache, fully associative,doesnt apply here,16 lines, least frequently used
+	demo.setcache(2,2,8,2,2);// 3rd caceh, nset ,8sets,4lines, least recently used
 	unsigned int t=0;
 	for(int i=0; i<2000;i++){
-		t=rand()%500;
-		demo.feedforward(t);
+		t=rand()%5000;
+		demo.emulatebehaviour(t);
 		demo.display();
 		cout<<"-----------------------------------------------------\n";			
 	}
+	cout<<"sim ended\n";
 	return 0;
 }
