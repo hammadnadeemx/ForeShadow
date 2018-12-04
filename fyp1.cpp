@@ -140,18 +140,6 @@ class cacheblock{
 	}
 	void writec2f(fstream &obj){// write content to file
 		string temp;
-		if(ep==4){
-			temp="index is ";
-			temp+=to_string(indexf);
-			temp+="\n";
-			obj<<temp;
-		}
-		else if ((ep==2)||(ep==6)){
-			temp="current time is ";
-			temp+=to_string(curtime);
-			temp+="\n";
-			obj<<temp;
-		}
 		for(int i=0;i<blocksize;i++){
 			temp="Line ";
 			temp+=to_string(i);
@@ -621,7 +609,7 @@ class simulator{
 			delete [] ptr;
 			ptr=nullptr;
 		}
-		fileout.flush();// doesnt flush
+		fileout.flush();// doesnt flush need to check if file writes completely
 	}	
 };
 int main(){
