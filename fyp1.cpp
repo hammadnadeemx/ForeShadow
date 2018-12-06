@@ -562,6 +562,10 @@ class simulator{
 	}
 	void emulatebehaviour(string memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
 		curtime++; // increament time value
+		string temp="Requested mem: ";
+		temp+=memaddr;
+		temp+="\n";
+		fileout<<temp;
 		for(int i=0;i<numofcaches;i++){
 			if(!(ptr[i]->isHit(memaddr))){// if not hit
 				sbpf->predictn(memaddr,predictres);// get sequence of address to fetch
