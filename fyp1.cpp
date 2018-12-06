@@ -346,6 +346,14 @@ class cache{// need to turn this into abstract class
 		}
 		return false;
 	}
+	bool isAlreadyinCache(string memaddr){
+		for(int i=0;i<nblocks;i++){
+			if(ptr[i].isHit(memaddr)){
+				return true;		
+			}	
+		}
+		return false;
+	}
 	void display(){// just to see whats going on 
 		for(int i=0;i<nblocks;i++){
 			cout<<"Block "<<i<<":\n";
@@ -405,6 +413,9 @@ class directmapped: public cache{
 	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
 	}
+	bool isitincache(string memaddr){
+		return ptr->isAlreadyinCache(memaddr);
+	}
 	unsigned int getcurrenthit(){
 		return ptr->getcurrenthit();
 	}
@@ -439,6 +450,9 @@ class fullyassociative: public cache{
 	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
 	}
+	bool isitincache(string memaddr){
+		return ptr->isAlreadyinCache(memaddr);
+	}
 	unsigned int getcurrenthit(){
 		return ptr->getcurrenthit();
 	}
@@ -472,6 +486,9 @@ class nsetassociative: public cache{
 	}
 	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
+	}
+	bool isitincache(string memaddr){
+		return ptr->isAlreadyinCache(memaddr);
 	}
 	unsigned int getcurrenthit(){
 		return ptr->getcurrenthit();
@@ -570,7 +587,7 @@ class simulator{
 			if(!(ptr[i]->isHit(memaddr))){// if not hit
 				sbpf->predictn(memaddr,predictres);// get sequence of address to fetch
 				for(int j=0;j<sbpf->getsize();j++){// prefetch those sequences
-					if(!(ptr[i]->isHit(predictres[j])))// as long as its not already in the cache ( dont want duplicates)
+					if(!(ptr[i]->isAlreadyinCache(predictres[j])))// as long as its not already in the cache ( dont want duplicates)
 						ptr[i]->updatecache(predictres[j]);	
 				}
 			}
@@ -622,7 +639,8 @@ int main(){
 	string line;
 	input.open("memtrace",ios::in);
 	for(int i=0; i<2000;i++){
-		getline( input, line );
+		getline(input,line);
+		line.erase(0,2);
 		demo.emulatebehaviour(line);
 		demo.write2file();
 		demo.display();
