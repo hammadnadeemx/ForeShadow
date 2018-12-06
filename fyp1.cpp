@@ -9,7 +9,7 @@ using namespace std;
 unsigned long int curtime=0;// time used for time based eviction policies
 class cacheblock{
 	private:
-	unsigned int *memblock;// the fullfat storage -cache lines in our case stores mem addresses
+	string *memblock;// the fullfat storage -cache lines in our case stores mem addresses
 	int blocksize;// number of data lines
 	int ep;// eviction policy needed to handle various tasks
 	unsigned int *freqcount;// used to store frequency of lfu or time stamp of lru
@@ -36,9 +36,9 @@ class cacheblock{
 			freqcount=nullptr;
 		}
 		indexf=0;
-		memblock=new unsigned int[blocksize];
+		memblock=new string[blocksize];
 		for(int i=0; i<blocksize;i++){
-			memblock[i]=0;			
+			memblock[i]="0";			
 		}
 	}
 	cacheblock(){
@@ -60,7 +60,7 @@ class cacheblock{
 				this->freqcount[i]=old.freqcount[i];			
 			}
 		}
-		memblock=new unsigned int[blocksize];
+		memblock=new string[blocksize];
 		for(int i=0; i<blocksize;i++){
 			this->memblock[i]=old.memblock[i];			
 		}
@@ -82,7 +82,7 @@ class cacheblock{
 					this->freqcount[i]=rhs.freqcount[i];			
 				}
 			}
-			memblock=new unsigned int[blocksize];
+			memblock=new string[blocksize];
 			for(int i=0; i<blocksize;i++){
 				this->memblock[i]=rhs.memblock[i];			
 			}
@@ -114,9 +114,9 @@ class cacheblock{
 			freqcount=nullptr;
 		}
 		indexf=0;
-		memblock=new unsigned int[blocksize];
+		memblock=new string[blocksize];
 		for(int i=0; i<blocksize;i++){
-			memblock[i]=0;			
+			memblock[i]="0";			
 		}
 		cout<<"Cache configuration updated \n";
 	}
@@ -144,23 +144,15 @@ class cacheblock{
 			temp="Line ";
 			temp+=to_string(i);
 			temp+=": ";
-			temp+=to_string(memblock[i]);
-			if(ep==2){
-				temp+=" time stamp ";
-				temp+=to_string(freqcount[i]);
-			}
-			else if(ep==3){
-				temp+=" frequency of use ";
-				temp+=to_string(freqcount[i]);
-			}
+			temp+=memblock[i];
 			temp+="\n";
 			obj<<temp;
 		}
 	}
-	bool isHit(unsigned int memaddress){// check to see if data at memory is present in cache block
-		if(memaddress>=0){
+	bool isHit(string memaddress){// check to see if data at memory is present in cache block
+		if(!(memaddress.empty())){
 			for(int i=0; i<blocksize;i++){
-				if(memblock[i]==memaddress){
+				if((memblock[i].compare(memaddress))==0){
 					if(ep==3){
 						freqcount[i]=freqcount[i]+1;// update useage count
 					}
@@ -177,7 +169,7 @@ class cacheblock{
 			return false;
 		}
 	}
-	void fetchFromMem(unsigned int memaddress){// instructs to place mem in cache
+	void fetchFromMem(string memaddress){// instructs to place mem in cache
 		switch(ep){
 			case 1:{ // random replacement 
 				int p=rand()%blocksize;
@@ -345,7 +337,7 @@ class cache{// need to turn this into abstract class
 	unsigned int getcurrenthit(){
 		return hits;
 	}
-	bool isHit(unsigned int memaddr){// need to call this to maintain time value else update time manually
+	bool isHit(string memaddr){
 		for(int i=0;i<nblocks;i++){
 			if(ptr[i].isHit(memaddr)){
 				hits++;
@@ -371,15 +363,15 @@ class cache{// need to turn this into abstract class
 			ptr[i].writec2f(obj);
 		}
 	}
-	void updatecache(unsigned int memaddress){// where does the pretecher come in ? needs work
+	void updatecache(string memaddress){// where does the pretecher come in ? needs work
+		unsigned long  setnum=stol(memaddress,0,16);
+		setnum=setnum%nblocks;
 		switch(type){
 			case 1:{ // direct mapped
-				int setnum=memaddress%nblocks;
 				ptr[setnum].fetchFromMem(memaddress);
 				break;
 			}
 			case 2:{ // nset associative
-				int setnum=memaddress%nblocks;
 				ptr[setnum].fetchFromMem(memaddress);
 				break;
 			}
@@ -410,7 +402,7 @@ class directmapped: public cache{
 			delete ptr;
 		ptr=new cache(numsets,1,evictionpolicy,1);
 	}
-	bool ishit(unsigned int memaddr){
+	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
 	}
 	unsigned int getcurrenthit(){
@@ -422,7 +414,7 @@ class directmapped: public cache{
 	void print2file(fstream &obj){
 		ptr->print2file(obj);
 	}
-	void updatecache(unsigned int memaddr){
+	void updatecache(string memaddr){
 		ptr->updatecache(memaddr);
 	}	
 	~directmapped(){
@@ -444,7 +436,7 @@ class fullyassociative: public cache{
 			delete ptr;
 		ptr=new cache(1,3,evictionpolicy,numoflines);
 	}
-	bool ishit(unsigned int memaddr){
+	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
 	}
 	unsigned int getcurrenthit(){
@@ -456,7 +448,7 @@ class fullyassociative: public cache{
 	void print2file(fstream &obj){
 		ptr->print2file(obj);
 	}
-	void updatecache(unsigned int memaddr){
+	void updatecache(string memaddr){
 		ptr->updatecache(memaddr);
 	}	
 	~fullyassociative(){
@@ -478,7 +470,7 @@ class nsetassociative: public cache{
 			delete ptr;
 		ptr=new cache(numofsets,2,evictionpolicy,numoflines);
 	}
-	bool ishit(unsigned int memaddr){
+	bool ishit(string memaddr){
 		return ptr->isHit(memaddr);
 	}
 	unsigned int getcurrenthit(){
@@ -490,7 +482,7 @@ class nsetassociative: public cache{
 	void print2file(fstream &obj){
 		ptr->print2file(obj);
 	}
-	void updatecache(unsigned int memaddr){
+	void updatecache(string memaddr){
 		ptr->updatecache(memaddr);
 	}	
 	~nsetassociative(){
@@ -502,7 +494,7 @@ class nsetassociative: public cache{
 };
 class prefetcher{
 	public:
-	virtual void predictn(int,int*)=0;
+	virtual void predictn(string,string*)=0;
 	virtual int getsize()=0;
 };
 class streambuffer: public prefetcher{
@@ -512,9 +504,13 @@ class streambuffer: public prefetcher{
 	streambuffer(int lenght=4){
 		len=lenght;
 	}
-	void predictn(int address, int* result){
+	void predictn(string address, string* result){// need to add addition logic and conversion here
+		unsigned long  setnum=stol(address,0,16),temp;
 		for(int i=0;i<len;i++){
-			result[i]=address+i+1;
+			temp=setnum+1+i;
+			stringstream sstream;
+			sstream<<std::hex<<temp;
+			result[i]=sstream.str();
 		}
 	}
 	int getsize(){
@@ -526,7 +522,7 @@ class simulator{
 	cache **ptr;//  array of caches
 	bool setup;// all caches under this simulation ready for use ?
 	int numofcaches;// number of caches
-	int predictres[4];
+	string predictres[4];
 	prefetcher* sbpf;
 	fstream fileout;
 	public:
@@ -564,7 +560,7 @@ class simulator{
 		}
 		return op;		
 	}
-	void emulatebehaviour(unsigned int memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
+	void emulatebehaviour(string memaddr){// the concept of pre-fecthing should be added here--- We cant ask the cache to fit every thing from ram in it !!!
 		curtime++; // increament time value
 		for(int i=0;i<numofcaches;i++){
 			if(!(ptr[i]->isHit(memaddr))){// if not hit
@@ -618,10 +614,12 @@ int main(){
 	demo.setcache(0,1,16,1,1);// 0 is index of first cache , 1 is directmapped, 16 sets ,1 line per cache, doesnt apply here ,1 rr but it doesnt apply here
 	demo.setcache(1,3,8,16,3);//1th cache, fully associative,doesnt apply here,16 lines, least frequently used
 	demo.setcache(2,2,8,2,2);// 3rd caceh, nset ,8sets,4lines, least recently used
-	unsigned int t=0;
+	fstream input;
+	string line;
+	input.open("memtrace",ios::in);
 	for(int i=0; i<2000;i++){
-		t=rand()%5000;
-		demo.emulatebehaviour(t);
+		getline( input, line );
+		demo.emulatebehaviour(line);
 		demo.write2file();
 		demo.display();
 		cout<<"-----------------------------------------------------\n";			
